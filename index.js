@@ -1,7 +1,7 @@
-// WhatsApp 1-on-1 Chatbot using Grok API
 const express = require("express");
 const bodyParser = require("body-parser");
 const axios = require("axios");
+
 const app = express();
 app.use(bodyParser.json());
 
@@ -9,15 +9,20 @@ const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN;
 const GROK_API_KEY = process.env.GROK_API_KEY;
 const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
 
+// POST: Handle incoming messages
 app.post("/webhook", async (req, res) => {
+  console.log("📥 Incoming webhook:", JSON.stringify(req.body, null, 2));
+
   const entry = req.body.entry?.[0]?.changes?.[0]?.value?.messages?.[0];
 
   if (entry && entry.text && entry.from) {
     const userMessage = entry.text.body;
     const userNumber = entry.from;
 
+    console.log(`💬 Message from ${userNumber}: ${userMessage}`);
+
     try {
-      // Grok API call
+      // Call Grok API
       const grokRes = await axios.post("https://api.x.ai/v1/chat/completions", {
         model: "grok-1",
         messages: [{ role: "user", content: userMessage }]
@@ -30,8 +35,10 @@ app.post("/webhook", async (req, res) => {
 
       const reply = grokRes.data.choices?.[0]?.message?.content || "माफ कीजिए, मैं जवाब नहीं दे सका।";
 
-      // WhatsApp reply
-      await axios.post(`https://graph.facebook.com/v18.0/${PHONE_NUMBER_ID}/messages`, {
+      console.log(`🤖 Reply from Grok: ${reply}`);
+
+      // Send reply on WhatsApp
+      const waRes = await axios.post(`https://graph.facebook.com/v18.0/${PHONE_NUMBER_ID}/messages`, {
         messaging_product: "whatsapp",
         to: userNumber,
         text: { body: reply }
@@ -42,17 +49,20 @@ app.post("/webhook", async (req, res) => {
         }
       });
 
+      console.log("✅ Message sent to WhatsApp:", waRes.data);
+
       res.sendStatus(200);
     } catch (err) {
-      console.error("❌ Error:", err.message);
+      console.error("❌ Error during processing:", err.response?.data || err.message);
       res.sendStatus(500);
     }
   } else {
+    console.log("ℹ️ Message skipped (not a text message or malformed)");
     res.sendStatus(200);
   }
 });
 
-// Webhook verification
+// GET: Webhook verification
 app.get("/webhook", (req, res) => {
   const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
   const mode = req.query["hub.mode"];
@@ -60,10 +70,15 @@ app.get("/webhook", (req, res) => {
   const challenge = req.query["hub.challenge"];
 
   if (mode === "subscribe" && token === VERIFY_TOKEN) {
+    console.log("✅ Webhook verified");
     res.status(200).send(challenge);
   } else {
+    console.log("❌ Webhook verification failed");
     res.sendStatus(403);
   }
 });
 
-app.listen(3000, () => console.log("🤖 WhatsApp Chatbot running on port 3000"));
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`🤖 WhatsApp Chatbot running on port ${PORT}`);
+});
