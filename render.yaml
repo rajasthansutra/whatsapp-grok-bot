@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: whatsapp-grok-bot
+    env: node
+    plan: free
+    buildCommand: "npm install"
+    startCommand: "node index.js"
+    envVars:
+      - key: WHATSAPP_TOKEN
+        value: your_whatsapp_token
+      - key: GROK_API_KEY
+        value: your_grok_api_key
+      - key: PHONE_NUMBER_ID
+        value: your_phone_number_id
+      - key: VERIFY_TOKEN
+        value: your_verify_token
